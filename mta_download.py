@@ -49,7 +49,6 @@ def main():
         usage()
     start_date = sys.argv[1]
     end_date = sys.argv[2]
-    print("Running mta_download.py with start date = {} and end date = {}".format(start_date, end_date))
     try:
         start_date = parse(start_date)
     except ValueError:
@@ -58,6 +57,7 @@ def main():
         end_date = parse(end_date)
     except ValueError:
         usage("Invalid END_DATE")
+    print("Running mta_download.py with start date = {} and end date = {}".format(start_date, end_date))
     download_range(start_date, end_date)
 
 if __name__ == "__main__":
