@@ -1,11 +1,7 @@
 from datetime import datetime
 from datetime import timedelta
-from google.protobuf.json_format import MessageToJson
 import requests
 import sys
-import gtfs_realtime_pb2
-import argparse
-
 """
 Top Level TODOs
 v0: just works
@@ -18,13 +14,9 @@ v1: this is the version that we will release
     - better error handling
         - more graceful parsing
     - logging
-    - TODO: use argparse
     - dumps a file to describe the current run
-v2:
-    - --json for saving the data to json
 """
 MINUTES = [1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56]
-FEED_MESSAGE = gtfs_realtime_pb2.FeedMessage()
 
 def usage(extra_str=""):
     # TODO what if the directory already exists? did we make it on a previous run?
@@ -32,12 +24,12 @@ def usage(extra_str=""):
     print("""
             {}
 
-            Usage: python mta_download.py LINE START_DATE [END_DATE] [DIRECTORY]
+            Usage: python mta_download.py LINE START_DATE END_DATE DIR
             Please note: this script is sensitive to the order of the passed in
-            params.
+            params. All arguments are required.
                 LINE: the specific line to download data for.()
-                START_DATE: Form YYYY-MM-DD e.g 2020-01-01. Required
-                END_DATE: Exclusive. Form YYYY-MM-DD e.g 2020-01-02. Optional (default is today)
+                START_DATE: Form YYYY-MM-DD e.g 2020-01-01.
+                END_DATE: Exclusive. Form YYYY-MM-DD e.g 2020-01-02.
                 DIRECTORY: the directory for output. Optional (default =
                 $HOME/mta_download)
           """.format(extra_str))
@@ -47,14 +39,8 @@ def parse(date_str):
     return datetime.strptime(date_str,'%Y-%m-%d').date()
 
 def handle_response(response, dt):
-    FEED_MESSAGE.Clear()
-    if FEED_MESSAGE.ParseFromString(response.content) <= 0:
-        print("parsing has failed...")
-        return
     with open("/tmp/mta/{}".format(dt), "wb+") as f:
-        f.write(FEED_MESSAGE.SerializeToString())
-
-
+        f.write(response.content)
 
 def download_range(date_begin, date_end):
     curr_date = date_begin;
