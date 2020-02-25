@@ -10,7 +10,6 @@ import argparse
 Top Level TODOs
 v0: just works
     - 1 line
-    - no times.
     - optional end_date
     - the key can be a env var
 
@@ -66,13 +65,14 @@ def download_range(date_begin, date_end):
 def download(curr_date):
     for hr in range(24):
         for m in MINUTES:
-            url = "https://datamine-history.s3.amazonaws.com/gtfs-%s-%02d-%02d" % (str(curr_date), hr, m)
+            dt = "%s-%02d-%02d" % (str(curr_date), hr, m)
+            url = "https://datamine-history.s3.amazonaws.com/gtfs-%s" % (dt)
             response = requests.get(url)
             if response.status_code < 400:
-                print("Successfully downloaded {} {}:{}".format(curr_date, hr, m))
-                handle_response(response, curr_date)
+                print("Successfully downloaded {}".format(dt))
+                handle_response(response, dt)
             else:
-                print("Error on date {} {}:{}. Status Code = {}".format(curr_date, hr, m, response.status_code))
+                print("Error on {}. Status Code = {}".format(dt, response.status_code))
 
 
 def main():
