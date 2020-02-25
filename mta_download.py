@@ -1,7 +1,9 @@
 from datetime import datetime
 from datetime import timedelta
+from google.protobuf.json_format import MessageToJson
 import requests
 import sys
+import gtfs_realtime_pb2
 
 """
 Top Level TODOs
@@ -17,11 +19,12 @@ v1: this is the version that we will release
         - more graceful parsing
     - logging
     - TODO: use argparse
-    - dumps a file to describe the current ru
-        - in it, we describe the datetimes that we expected to work
-        but just didn't.
+    - dumps a file to describe the current run
+v2:
+    - --json for saving the data to json
 """
 MINUTES = [1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56]
+FEED_MESSAGE = gtfs_realtime_pb2.FeedMessage()
 
 def usage(extra_str=""):
     # TODO what if the directory already exists? did we make it on a previous run?
@@ -43,8 +46,14 @@ def usage(extra_str=""):
 def parse(date_str):
     return datetime.strptime(date_str,'%Y-%m-%d').date()
 
-def handle_response(response):
-    pass
+def handle_response(response, dt):
+    FEED_MESSAGE.Clear()
+    if FEED_MESSAGE.ParseFromString(response.content) <= 0:
+        print("parsing has failed...")
+        return
+    with open("/tmp/mta/{}".format(dt), "wb+") as f:
+        f.write(FEED_MESSAGE.SerializeToString())
+
 
 
 def download_range(date_begin, date_end):
@@ -57,10 +66,10 @@ def download(curr_date):
     for hr in range(24):
         for m in MINUTES:
             url = "https://datamine-history.s3.amazonaws.com/gtfs-%s-%02d-%02d" % (str(curr_date), hr, m)
-            print("downloading: {}".format(url))
             response = requests.get(url)
             if response.status_code < 400:
-                handle_data(response)
+                print("Successfully downloaded {} {}:{}".format(curr_date, hr, m))
+                handle_response(response, curr_date)
             else:
                 print("Error on date {} {}:{}. Status Code = {}".format(curr_date, hr, m, response.status_code))
 
