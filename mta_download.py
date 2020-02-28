@@ -3,20 +3,16 @@ from datetime import timedelta
 import requests
 import sys
 import os
+import gtfs_realtime_pb2
+from google.protobuf.json_format import MessageToJson
+from urllib.parse import urlparse
 
 """
-Top Level TODOs
-v0: just works
-    - 1 line
-    - optional end_date
-    - the key can be a env var
-
 v1: this is the version that we will release
-    - variable number of lines.
-    - better error handling
-        - more graceful parsing
-    - logging
-    - dumps a file to describe the current run
+    - variable number of lines [done]
+    - logging and csv dumping at the end [done]
+    - dumps a file to describe the current run [done]
+    - download in parallel.
 """
 MINUTES = [1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56]
 BASE_URL = "https://datamine-history.s3.amazonaws.com/gtfs"
@@ -29,6 +25,8 @@ URL_EXT = {
 BASE_DIR = ""
 STATS_FILENAME = ""
 LINE = ""
+DUMP_JSON = False
+FEED_MESSAGE = gtfs_realtime_pb2.FeedMessage()
 
 def log(line):
     print(line)
@@ -36,28 +34,36 @@ def log(line):
         f.write(line)
         f.write("\n")
 
-def usage(extra_str=""):
+def usage(extra_str="Incorrect Usage"):
     # TODO what if the directory already exists? did we make it on a previous run?
     # let's punt this for later.
     print("""
             {}
 
-            Usage: python mta_download.py LINE START_DATE END_DATE DIR
+            Usage: python mta_download.py LINE START_DATE END_DATE DIR [--json]
             Please note: this script is sensitive to the order of the passed in
             params. All arguments are required.
-                LINE: Which train line to download from. One of {numbers,l,SIR} for trains 1-6, the L train, and the staten island railway respectively.
+                LINE: Which train line to download from. One of numbers,l,sir for trains 1-6, the L train, and the staten island railway respectively.
                 START_DATE: Form YYYY-MM-DD e.g 2020-01-01.
                 END_DATE: Exclusive. Form YYYY-MM-DD e.g 2020-01-02.
                 DIRECTORY: the directory for output, must already exist
+                --json: convert the output from gtfs_pb2.FeedMessage binary protos to json
           """.format(extra_str))
     sys.exit(-1)
 
 def parse(date_str):
     return datetime.strptime(date_str,'%Y-%m-%d').date()
 
-def handle_response(response, dt):
-    with open(os.path.join(BASE_DIR, "{}".format(dt)), "wb+") as f:
-        f.write(response.content)
+def handle_response(response, filename):
+    if DUMP_JSON:
+        filename = filename + ".json"
+        with open(os.path.join(BASE_DIR, "{}".format(filename)), "w+") as f:
+            FEED_MESSAGE.Clear()
+            FEED_MESSAGE.ParseFromString(response.content)
+            f.write(MessageToJson(FEED_MESSAGE))
+    else:
+        with open(os.path.join(BASE_DIR, "{}".format(filename)), "wb+") as f:
+            f.write(response.content)
 
 def download_range(nondated_url, date_begin, date_end):
     curr_date = date_begin;
@@ -73,7 +79,7 @@ def download(nondated_url, curr_date):
             response = requests.get(full_url)
             if response.status_code < 400:
                 log("Successfully downloaded {}".format(dt))
-                handle_response(response, dt)
+                handle_response(response, urlparse(full_url).path.replace('/',''))
             else:
                 log("Error on {}. Status Code = {}".format(dt, response.status_code))
 
@@ -81,8 +87,8 @@ def build_nondate_url():
     return BASE_URL + URL_EXT[LINE]
 
 def main():
-    if len(sys.argv) != 5:
-        usage()
+    if len(sys.argv) != 5 and len(sys.argv) != 6:
+        usage(len(sys.argv))
     global LINE
     LINE = sys.argv[1]
     # validate the line
@@ -108,7 +114,12 @@ def main():
     global STATS_FILENAME
     BASE_DIR = os.path.join(sys.argv[4], "")
     STATS_FILENAME = os.path.join(BASE_DIR, "run-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".txt")
-    log("Running mta_download.py with start date = {} and end date = {}".format(start_date, end_date))
+    if len(sys.argv) == 6:
+        if sys.argv[5] != "--json":
+            usage("--json flag not passed in correctly")
+        global DUMP_JSON
+        DUMP_JSON = True
+    log("Running mta_download.py. Command was: {}".format(" ".join(sys.argv)))
     url = build_nondate_url()
     download_range(url, start_date, end_date)
 
