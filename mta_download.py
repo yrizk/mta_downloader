@@ -4,6 +4,9 @@ import requests
 import sys
 import os
 import gtfs_realtime_pb2
+import multiprocessing
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from google.protobuf.json_format import MessageToJson
 from urllib.parse import urlparse
 
@@ -12,7 +15,8 @@ v1: this is the version that we will release
     - variable number of lines [done]
     - logging and csv dumping at the end [done]
     - dumps a file to describe the current run [done]
-    - download in parallel.
+    - download in parallel. [done]
+    - figure out what's wrong with 2015-09-17-03-16 more importantly: what is our stance?
 """
 MINUTES = [1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56]
 BASE_URL = "https://datamine-history.s3.amazonaws.com/gtfs"
@@ -27,6 +31,7 @@ STATS_FILENAME = ""
 LINE = ""
 DUMP_JSON = False
 FEED_MESSAGE = gtfs_realtime_pb2.FeedMessage()
+FILENAME = datetime.now().strftime("%Y%m%d-%H%M%S")
 
 def log(line):
     print(line)
@@ -57,10 +62,15 @@ def parse(date_str):
 def handle_response(response, filename):
     if DUMP_JSON:
         filename = filename + ".json"
-        with open(os.path.join(BASE_DIR, "{}".format(filename)), "w+") as f:
-            FEED_MESSAGE.Clear()
-            FEED_MESSAGE.ParseFromString(response.content)
-            f.write(MessageToJson(FEED_MESSAGE))
+        try:
+            with open(os.path.join(BASE_DIR, "{}".format(filename)), "w+") as f:
+                FEED_MESSAGE.Clear()
+                FEED_MESSAGE.MergeFromString(response.content)
+                f.write(MessageToJson(FEED_MESSAGE))
+        except google.protobuf.message.DecodeError:
+            log("Error parsing the binary into a FeedMessage for {}. Saving as raw binary instead".format(filename))
+            with open(os.path.join(BASE_DIR, "{}".format(filename)), "wb+") as f:
+                f.write(response.content)
     else:
         with open(os.path.join(BASE_DIR, "{}".format(filename)), "wb+") as f:
             f.write(response.content)
@@ -71,17 +81,25 @@ def download_range(nondated_url, date_begin, date_end):
         download(nondated_url, curr_date)
         curr_date += timedelta(days=1)
 
+def download_internal(dt, full_url):
+    response = requests.get(full_url)
+    if response.ok:
+        log("Successfully downloaded {}".format(dt))
+        handle_response(response, urlparse(full_url).path.replace('/',''))
+    else:
+        log("Error on {}. Status Code = {}".format(dt, response.status_code))
+
+
 def download(nondated_url, curr_date):
-    for hr in range(24):
-        for m in MINUTES:
-            dt = "%s-%02d-%02d" % (str(curr_date), hr, m)
-            full_url = nondated_url + "-%s" % (dt)
-            response = requests.get(full_url)
-            if response.status_code < 400:
-                log("Successfully downloaded {}".format(dt))
-                handle_response(response, urlparse(full_url).path.replace('/',''))
-            else:
-                log("Error on {}. Status Code = {}".format(dt, response.status_code))
+    with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+        futures = []
+        for hr in range(24):
+            for m in MINUTES:
+                dt = "%s-%02d-%02d" % (str(curr_date), hr, m)
+                full_url = nondated_url + "-%s" % (dt)
+                futures.append(executor.submit(download_internal, dt, full_url))
+        for f in futures:
+            f.result()
 
 def build_nondate_url():
     return BASE_URL + URL_EXT[LINE]
@@ -113,7 +131,8 @@ def main():
     global BASE_DIR
     global STATS_FILENAME
     BASE_DIR = os.path.join(sys.argv[4], "")
-    STATS_FILENAME = os.path.join(BASE_DIR, "run-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".txt")
+    global FILENAME
+    STATS_FILENAME = os.path.join(BASE_DIR, "run-" + FILENAME + ".txt")
     if len(sys.argv) == 6:
         if sys.argv[5] != "--json":
             usage("--json flag not passed in correctly")
@@ -122,6 +141,7 @@ def main():
     log("Running mta_download.py. Command was: {}".format(" ".join(sys.argv)))
     url = build_nondate_url()
     download_range(url, start_date, end_date)
+    print("Done. diagnostics at {}".format(os.path.join(BASE_DIR, "run-" + FILENAME + ".txt")))
 
 if __name__ == "__main__":
     main()
