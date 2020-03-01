@@ -32,8 +32,6 @@ def log(line):
         f.write("\n")
 
 def usage(extra_str="Incorrect Usage"):
-    # TODO what if the directory already exists? did we make it on a previous run?
-    # let's punt this for later.
     print("""
             {}
 
