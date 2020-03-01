@@ -6,6 +6,7 @@ onto your machine.
 Requirements 
     - pyenv/pyvirtualenv which manages different versions of python and also
       manages the dependencies 
+    - `sudo pip3 install pipenv` and https://github.com/pyenv/pyenv-installer to install pipenv and pyenv respectively
 
 1.  clone the repository and cd into it.
 2.  `pyenv virtualenv 3.8.1 mta_downloader`
