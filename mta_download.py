@@ -10,14 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 from google.protobuf.json_format import MessageToJson
 from urllib.parse import urlparse
 
-"""
-v1: this is the version that we will release
-    - variable number of lines [done]
-    - logging and csv dumping at the end [done]
-    - dumps a file to describe the current run [done]
-    - download in parallel. [done]
-    - figure out what's wrong with 2015-09-17-03-16 more importantly: what is our stance?
-"""
 MINUTES = [1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56]
 BASE_URL = "https://datamine-history.s3.amazonaws.com/gtfs"
 URL_EXT = {
@@ -81,14 +73,13 @@ def download_range(nondated_url, date_begin, date_end):
         download(nondated_url, curr_date)
         curr_date += timedelta(days=1)
 
-def download_internal(dt, full_url):
+def download_historical_internal(dt, full_url):
     response = requests.get(full_url)
     if response.ok:
         log("Successfully downloaded {}".format(dt))
         handle_response(response, urlparse(full_url).path.replace('/',''))
     else:
         log("Error on {}. Status Code = {}".format(dt, response.status_code))
-
 
 def download(nondated_url, curr_date):
     with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
@@ -97,7 +88,7 @@ def download(nondated_url, curr_date):
             for m in MINUTES:
                 dt = "%s-%02d-%02d" % (str(curr_date), hr, m)
                 full_url = nondated_url + "-%s" % (dt)
-                futures.append(executor.submit(download_internal, dt, full_url))
+                futures.append(executor.submit(download_historical_internal, dt, full_url))
         for f in futures:
             f.result()
 
