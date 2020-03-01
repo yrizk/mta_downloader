@@ -7,9 +7,10 @@ Requirements
     - pyenv/pyvirtualenv which manages different versions of python and also
       manages the dependencies 
 
-1.  clone the repository
-2.  `pipenv install` to install the dependencies.
-3.  `pipenv shell` to enter the virtualenv
+1.  clone the repository and cd into it.
+2.  `pyenv virtualenv 3.8.1 mta_downloader`
+3.  `pyenv activate mta_downloader`
+4.  `pipenv install` to install the dependencies.
 
 ## Usage: 
 ```
