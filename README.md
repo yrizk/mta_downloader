@@ -27,7 +27,9 @@ unfortunately the data on the mta servers appears to be sparse
 this is based on looking from 2017-09-17 ~ 2017-10.
 
 Here the information is displayed in a table.
+```
 line | success | fail
 1-6  | 8667    | 260
 sir  | 0       | 1630 
 l    | 0       | 8928
+```
