@@ -8,7 +8,8 @@ Requirements
       manages the dependencies 
 
 1.  clone the repository
-2.  pyenv install to install the dependencies.
+2.  `pipenv install` to install the dependencies.
+3.  `pipenv shell` to enter the virtualenv
 
 ## Usage: 
 ```
