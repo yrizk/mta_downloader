@@ -1,3 +1,4 @@
+from crontab import CronTab
 from datetime import datetime, timedelta
 import requests
 import sys
@@ -11,12 +12,34 @@ from urllib.parse import urlparse
 
 MINUTES = [1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56]
 BASE_URL = "https://datamine-history.s3.amazonaws.com/gtfs"
-URL_EXT = {
+HISTORICAL_URL_EXT = {
     "numbers" : "",
     "l": "l",
     "sir": "si"
 }
 
+REALTIME_COLOR_TO_FEEDID = {
+    "numbers" : "1",
+    "blues"   : "26",
+    "yellow"  : "16",
+    "orange"  : "21",
+    "l"       : "2",
+    "sir"     : "11",
+    "g"       : "31",
+    "brown"   : "36",
+    "purple"  : "51"
+}
+"""
+TODO
+0. write: the cron job will just be a curl command that downloads to the directory of interest.
+1. provide: a way to clear all the cron jobs that mta_downloader knows about.
+    --del-all-crons. this counts as the second way the python script can be started
+2. provide: a way for the cron job to run just the downloading and handling of response.
+    this will be the third way this python script is started. --from-cron --date --dir --log [--json]
+3. add to the readme that they need `export MTA_API_KEY=` and should have it in .zshrc/.bashrc
+How will logging work? Ideally, we log to the same file, especially now that we have timestamps
+4.  change
+"""
 BASE_DIR = ""
 STATS_FILENAME = ""
 LINE = ""
@@ -51,6 +74,13 @@ def usage(extra_str="Incorrect Usage"):
 
 def parse(date_str):
     return datetime.strptime(date_str,'%Y-%m-%d').date()
+
+def clear_all_crons():
+    cron = CronTab(user=os.getenv('USER'))
+    for job in cron
+        if job.comment == 'dateinfo':
+            cron.remove(job)
+            cron.write()
 
 def handle_response(response, filename):
     if DUMP_JSON:
@@ -94,7 +124,7 @@ def download(nondated_url, curr_date):
             f.result()
 
 def build_nondate_url():
-    return BASE_URL + URL_EXT[LINE]
+    return BASE_URL + HISTORICAL_URL_EXT[LINE]
 
 def main():
     if len(sys.argv) != 5 and len(sys.argv) != 6:
@@ -102,7 +132,7 @@ def main():
     global LINE
     LINE = sys.argv[1]
     # validate the line
-    if LINE not in URL_EXT:
+    if LINE not in HISTORICAL_URL_EXT:
         usage("unrecognized line parameter: {}".format(line))
     start_date = sys.argv[2]
     end_date = sys.argv[3]
