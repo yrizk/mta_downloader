@@ -1,5 +1,4 @@
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 import requests
 import sys
 import os
@@ -23,12 +22,16 @@ STATS_FILENAME = ""
 LINE = ""
 DUMP_JSON = False
 FEED_MESSAGE = gtfs_realtime_pb2.FeedMessage()
-FILENAME = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+def now():
+    return datetime.now().strftime("%Y%m%d-%H%M%S")
+
+FILENAME = now()
 
 def log(line):
     print(line)
     with open(STATS_FILENAME, "a+") as f:
-        f.write(line)
+        f.write("{}: ".format(now()) + line)
         f.write("\n")
 
 def usage(extra_str="Incorrect Usage"):
