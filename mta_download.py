@@ -10,14 +10,16 @@ from concurrent.futures import ThreadPoolExecutor
 from google.protobuf.json_format import MessageToJson
 from urllib.parse import urlparse
 
+# Constants needed for historical downloads
 MINUTES = [1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56]
-BASE_URL = "https://datamine-history.s3.amazonaws.com/gtfs"
+HISTORICAL_BASE_URL = "https://datamine-history.s3.amazonaws.com/gtfs"
 HISTORICAL_URL_EXT = {
     "numbers" : "",
     "l": "l",
     "sir": "si"
 }
 
+# Constants needed for realtime downloading.
 REALTIME_COLOR_TO_FEEDID = {
     "numbers" : "1",
     "blues"   : "26",
@@ -29,6 +31,9 @@ REALTIME_COLOR_TO_FEEDID = {
     "brown"   : "36",
     "purple"  : "51"
 }
+
+REALTIME_BASE_URL="http://datamine.mta.info/mta_esi.php?key=%s&feed_id=%s"
+
 """
 TODO
 0. write: the cron job will just be a curl command that downloads to the directory of interest.
@@ -49,7 +54,7 @@ FEED_MESSAGE = gtfs_realtime_pb2.FeedMessage()
 def now():
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
-FILENAME = now()
+FILENAME_TS = now()
 
 def log(line):
     print(line)
@@ -98,10 +103,25 @@ def handle_response(response, filename):
         with open(os.path.join(BASE_DIR, "{}".format(filename)), "wb+") as f:
             f.write(response.content)
 
+def add_cron_job(nondated_url, curr_date):
+    user = os.environ.get('USER', '')
+    if user is '':
+        usage("no USER env var set.")
+    api_key = os.environ.get('MTA_API_KEY', '')
+    if api_key is '':
+        usage("no MTA_API_KEY env var set. Please run `export MTA_API_KEY=<KEY>` and try again.")
+    cron = CronTab(user="{}".format(user))
+    cron.new(command="python {} --cron {}".format(script, api_key, curr_date, DIRECTORY, LINE), comment="mta_downloader-{}".format(FILENAME_TS))
+
+
+
 def download_range(nondated_url, date_begin, date_end):
     curr_date = date_begin;
     while (curr_date < date_end):
-        download(nondated_url, curr_date)
+        if curr < datetime.now():
+            download(nondated_url, curr_date)
+        else:
+            add_cron_job()
         curr_date += timedelta(days=1)
 
 def download_historical_internal(dt, full_url):
@@ -124,7 +144,10 @@ def download(nondated_url, curr_date):
             f.result()
 
 def build_nondate_url():
-    return BASE_URL + HISTORICAL_URL_EXT[LINE]
+    return HISTORICAL_BASE_URL + HISTORICAL_URL_EXT[LINE]
+
+def stats_filename():
+    return os.path.join(BASE_DIR, "run-" + FILENAME_TS + ".txt")
 
 def main():
     if len(sys.argv) != 5 and len(sys.argv) != 6:
@@ -133,7 +156,10 @@ def main():
     LINE = sys.argv[1]
     # validate the line
     if LINE not in HISTORICAL_URL_EXT:
-        usage("unrecognized line parameter: {}".format(line))
+        if LINE not in REALTIME_COLOR_TO_FEEDID:
+            usage("unrecognized line parameter: {}".format(line))
+        else:
+            log("selected line is not available for historical download.")
     start_date = sys.argv[2]
     end_date = sys.argv[3]
     # validate the dates
@@ -147,14 +173,16 @@ def main():
         end_date = parse(end_date)
     except ValueError:
         usage("Invalid END_DATE")
+    if start_date.year < 2014:
+        usage("Historical data is unavailable before 2014.")
     if not os.path.isdir(sys.argv[4]):
         usage("output directory = {} not found".format(sys.argv[4]))
     # did this param include the trailing slash? this normalizes both possibilities.
     global BASE_DIR
     global STATS_FILENAME
     BASE_DIR = os.path.join(sys.argv[4], "")
-    global FILENAME
-    STATS_FILENAME = os.path.join(BASE_DIR, "run-" + FILENAME + ".txt")
+    global FILENAME_TS
+    STATS_FILENAME = stats_filename()
     if len(sys.argv) == 6:
         if sys.argv[5] != "--json":
             usage("--json flag not passed in correctly")
@@ -163,7 +191,7 @@ def main():
     log("Running mta_download.py. Command was: {}".format(" ".join(sys.argv)))
     url = build_nondate_url()
     download_range(url, start_date, end_date)
-    print("Done. diagnostics at {}".format(os.path.join(BASE_DIR, "run-" + FILENAME + ".txt")))
+    print("Done. diagnostics at {}".format(stats_filename())))
 
 if __name__ == "__main__":
     main()
