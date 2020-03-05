@@ -32,18 +32,12 @@ REALTIME_COLOR_TO_FEEDID = {
     "purple"  : "51"
 }
 
-REALTIME_BASE_URL="http://datamine.mta.info/mta_esi.php?key=%s&feed_id=%s"
 
 """
 TODO
-0. write: the cron job will just be a curl command that downloads to the directory of interest.
-1. provide: a way to clear all the cron jobs that mta_downloader knows about.
-    --del-all-crons. this counts as the second way the python script can be started
-2. provide: a way for the cron job to run just the downloading and handling of response.
-    this will be the third way this python script is started. --from-cron --date --dir --log [--json]
 3. add to the readme that they need `export MTA_API_KEY=` and should have it in .zshrc/.bashrc
 How will logging work? Ideally, we log to the same file, especially now that we have timestamps
-4.  change
+4. change
 """
 BASE_DIR = ""
 STATS_FILENAME = ""
@@ -59,7 +53,7 @@ FILENAME_TS = now()
 def log(line):
     print(line)
     with open(STATS_FILENAME, "a+") as f:
-        f.write("{}: ".format(now()) + line)
+        f.write("[mta_download.py] {}: ".format(now()) + line)
         f.write("\n")
 
 def usage(extra_str="Incorrect Usage"):
@@ -83,15 +77,15 @@ def parse(date_str):
 def clear_all_crons():
     cron = CronTab(user=os.getenv('USER'))
     for job in cron
-        if job.comment == 'dateinfo':
+        if job.comment == 'mta_download':
             cron.remove(job)
             cron.write()
 
-def handle_response(response, filename):
-    if DUMP_JSON:
+def handle_response(base_dir, response, filename, dump_json):
+    if dump_json:
         filename = filename + ".json"
         try:
-            with open(os.path.join(BASE_DIR, "{}".format(filename)), "w+") as f:
+            with open(os.path.join(base_dir, "{}".format(filename)), "w+") as f:
                 FEED_MESSAGE.Clear()
                 FEED_MESSAGE.MergeFromString(response.content)
                 f.write(MessageToJson(FEED_MESSAGE))
@@ -111,9 +105,7 @@ def add_cron_job(nondated_url, curr_date):
     if api_key is '':
         usage("no MTA_API_KEY env var set. Please run `export MTA_API_KEY=<KEY>` and try again.")
     cron = CronTab(user="{}".format(user))
-    cron.new(command="python {} --cron {}".format(script, api_key, curr_date, DIRECTORY, LINE), comment="mta_downloader-{}".format(FILENAME_TS))
-
-
+    cron.new(command="pyenv activate mta && python {}/cron.py {} {} {} {} {}".format(os.getcwd(), api_key, curr_date, DIRECTORY, REALTIME_COLOR_TO_FEEDID[LINE], LINE), comment="mta_downloader-{}".format(FILENAME_TS))
 
 def download_range(nondated_url, date_begin, date_end):
     curr_date = date_begin;
@@ -128,7 +120,7 @@ def download_historical_internal(dt, full_url):
     response = requests.get(full_url)
     if response.ok:
         log("Successfully downloaded {}".format(dt))
-        handle_response(response, urlparse(full_url).path.replace('/',''))
+        handle_response(BASE_DIR, response, urlparse(full_url).path.replace('/',''), DUMP_JSON)
     else:
         log("Error on {}. Status Code = {}".format(dt, response.status_code))
 
