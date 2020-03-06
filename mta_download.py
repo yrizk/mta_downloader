@@ -33,13 +33,6 @@ REALTIME_COLOR_TO_FEEDID = {
     "purple"  : "51"
 }
 
-
-"""
-TODO
-3. add to the readme that they need `export MTA_API_KEY=` and should have it in .zshrc/.bashrc
-How will logging work? Ideally, we log to the same file, especially now that we have timestamps
-4. change
-"""
 BASE_DIR = ""
 STATS_FILENAME = ""
 LINE = ""
@@ -76,6 +69,9 @@ def parse(date_str):
     return datetime.strptime(date_str,'%Y-%m-%d').date()
 
 def clear_all_crons():
+    if platform.system() is 'Windows':
+        print('ERR: can not clear cron jobs from windows system')
+        return
     cron = CronTab(user=os.getenv('USER'))
     for job in cron
         if job.comment == 'mta_download':
