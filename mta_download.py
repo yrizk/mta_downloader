@@ -1,6 +1,7 @@
 from crontab import CronTab
 from datetime import datetime, timedelta
 import requests
+import platform
 import sys
 import os
 import gtfs_realtime_pb2
@@ -104,8 +105,15 @@ def add_cron_job(nondated_url, curr_date):
     api_key = os.environ.get('MTA_API_KEY', '')
     if api_key is '':
         usage("no MTA_API_KEY env var set. Please run `export MTA_API_KEY=<KEY>` and try again.")
-    cron = CronTab(user="{}".format(user))
-    cron.new(command="pyenv activate mta && python {}/cron.py {} {} {} {} {}".format(os.getcwd(), api_key, curr_date, DIRECTORY, REALTIME_COLOR_TO_FEEDID[LINE], LINE), comment="mta_downloader-{}".format(FILENAME_TS))
+    if platform.system() is 'Windows':
+        # daily at 23:50
+        cron = CronTab(tab="""50 23 * * * pyenv activate mta && python {}/cron.py {} {} {} {} {} {}""".format(os.getcwd(), api_key, curr_date, DIRECTORY, REALTIME_COLOR_TO_FEEDID[LINE], LINE, STATS_FILENAME))
+        cron.write()
+    else:
+        cron = CronTab(user="{}".format(user))
+        job = cron.new(command="pyenv activate mta && python {}/cron.py {} {} {} {} {} {}".format(os.getcwd(), api_key, curr_date, DIRECTORY, REALTIME_COLOR_TO_FEEDID[LINE], LINE, STATS_FILENAME), comment="mta_downloader-{}".format(FILENAME_TS))
+        job.setall('50 23 * * *')
+        cron.write()
 
 def download_range(nondated_url, date_begin, date_end):
     curr_date = date_begin;

@@ -28,7 +28,7 @@ def download(dt, full_url, api_key, feed_id, line):
 if __name__ == "__main__":
     # start parsing arguments
     global API_KEY, FEED_ID, DT, LINE, STATS_FILENAME
-    if len(sys.argv) != 6:
+    if len(sys.argv) != 7:
         log("Incorrect number of arguments")
         sys.exit(-1)
     API_KEY = sys.argv[1]
@@ -36,4 +36,5 @@ if __name__ == "__main__":
     BASE_DIR = sys.argv[3]
     FEED_ID = sys.argv[4]
     LINE = sys.argv[5]
+    STATS_FILENAME = sys.argv[6]
     download(DT, REALTIME_BASE_URL, API_KEY, FEED_ID, LINE)
