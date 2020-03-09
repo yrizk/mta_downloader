@@ -3,7 +3,7 @@ import os
 import sys
 import mta_download
 
-REALTIME_BASE_URL="http://datamine.mta.info/mta_esi.php?key=%s&feed_id=%s"
+REALTIME_BASE_URL="http://datamine.mta.info/mta_esi.php?key={}&feed_id={}"
 API_KEY = ""
 FEED_ID = ""
 DT = ""
@@ -19,7 +19,7 @@ def log(line):
 def handle_response(reponse):
 
 def download(dt, full_url, api_key, feed_id, line):
-    response = requests.get(full_url % (api_key, feed_id))
+    response = requests.get(full_url.format(api_key, feed_id))
     if response.ok:
         mta_download.handle_response(BASE_DIR, response, "{}-{}".format(dt,line))
     else:

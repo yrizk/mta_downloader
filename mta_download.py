@@ -32,10 +32,13 @@ REALTIME_COLOR_TO_FEEDID = {
     "brown"   : "36",
     "purple"  : "51"
 }
-
+# the existing directory in the system where the output will be dumped.
 BASE_DIR = ""
+# a file containing logs per invocation of this script
 STATS_FILENAME = ""
+# the line (l, numbers, blues, etc)
 LINE = ""
+# if true, dumps the data as json
 DUMP_JSON = False
 FEED_MESSAGE = gtfs_realtime_pb2.FeedMessage()
 
@@ -60,7 +63,7 @@ def usage(extra_str="Incorrect Usage"):
                 LINE: Which train line to download from. One of numbers,l,sir for trains 1-6, the L train, and the staten island railway respectively.
                 START_DATE: Form YYYY-MM-DD e.g 2020-01-01.
                 END_DATE: Exclusive. Form YYYY-MM-DD e.g 2020-01-02.
-                DIRECTORY: the directory for output, must already exist
+                BASE_DIR: the directory for output, must already exist
                 --json: convert the output from gtfs_pb2.FeedMessage binary protos to json
           """.format(extra_str))
     sys.exit(-1)
@@ -73,8 +76,8 @@ def clear_all_crons():
         print('ERR: can not clear cron jobs from windows system')
         return
     cron = CronTab(user=os.getenv('USER'))
-    for job in cron
-        if job.comment == 'mta_download':
+    for job in cron:
+        if job.comment.startswith('mta_download'):
             cron.remove(job)
             cron.write()
 
@@ -95,29 +98,33 @@ def handle_response(base_dir, response, filename, dump_json):
             f.write(response.content)
 
 def add_cron_job(nondated_url, curr_date):
+    """
+        adds a command to the system crontab to download the mta data.
+        this cron job run daily at 23:50 (so as contain all the data for that day)
+        for more information on what the cron job does, see cron.py
+    """
     user = os.environ.get('USER', '')
-    if user is '':
+    if user == '':
         usage("no USER env var set.")
     api_key = os.environ.get('MTA_API_KEY', '')
-    if api_key is '':
-        usage("no MTA_API_KEY env var set. Please run `export MTA_API_KEY=<KEY>` and try again.")
-    if platform.system() is 'Windows':
-        # daily at 23:50
-        cron = CronTab(tab="""50 23 * * * pyenv activate mta && python {}/cron.py {} {} {} {} {} {}""".format(os.getcwd(), api_key, curr_date, DIRECTORY, REALTIME_COLOR_TO_FEEDID[LINE], LINE, STATS_FILENAME))
+    if api_key == '':
+        usage("no MTA_API_KEY env var set. Please add `export MTA_API_KEY=<KEY>` to .bashrc/.zshrc and try again.")
+    if platform.system().startswith('Windows'):
+        cron = CronTab(tab="""50 23 * * * pyenv activate mta && python {}/cron.py {} {} {} {} {} {}""".format(os.getcwd(), api_key, curr_date, BASE_DIR, REALTIME_COLOR_TO_FEEDID[LINE], LINE, STATS_FILENAME))
         cron.write()
     else:
         cron = CronTab(user="{}".format(user))
-        job = cron.new(command="pyenv activate mta && python {}/cron.py {} {} {} {} {} {}".format(os.getcwd(), api_key, curr_date, DIRECTORY, REALTIME_COLOR_TO_FEEDID[LINE], LINE, STATS_FILENAME), comment="mta_downloader-{}".format(FILENAME_TS))
+        job = cron.new(command="pyenv activate mta && python {}/cron.py {} {} {} {} {} {}".format(os.getcwd(), api_key, curr_date, BASE_DIR, REALTIME_COLOR_TO_FEEDID[LINE], LINE, STATS_FILENAME), comment="mta_downloader-{}".format(FILENAME_TS))
         job.setall('50 23 * * *')
         cron.write()
 
 def download_range(nondated_url, date_begin, date_end):
     curr_date = date_begin;
     while (curr_date < date_end):
-        if curr < datetime.now():
+        if curr_date < datetime.now().date():
             download(nondated_url, curr_date)
         else:
-            add_cron_job()
+            add_cron_job(nondated_url, curr_date)
         curr_date += timedelta(days=1)
 
 def download_historical_internal(dt, full_url):
@@ -187,7 +194,7 @@ def main():
     log("Running mta_download.py. Command was: {}".format(" ".join(sys.argv)))
     url = build_nondate_url()
     download_range(url, start_date, end_date)
-    print("Done. diagnostics at {}".format(stats_filename())))
+    print("Done. diagnostics at {}".format(stats_filename()))
 
 if __name__ == "__main__":
     main()
